@@ -1,0 +1,14 @@
+[package]
+name = "yafzf"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.79"
+clap = { version = "4.4.13", features = ["derive"] }
+colored = "2.1.0"
+encoding_rs = "0.8.33"
+ignore = "0.4.21"
+regex = "1.10.2"
