@@ -11,4 +11,5 @@ clap = { version = "4.4.13", features = ["derive"] }
 colored = "2.1.0"
 encoding_rs = "0.8.33"
 ignore = "0.4.21"
+rayon = "1.8.0"
 regex = "1.10.2"

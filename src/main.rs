@@ -3,7 +3,7 @@ pub mod common;
 mod haystack;
 mod worker;
 
-use anyhow::Result;
+use anyhow::{Error, Result};
 use clap::Parser;
 use std::{env::current_dir, time::Instant};
 
@@ -18,17 +18,20 @@ fn main() -> Result<()> {
 
     let args = Cli::parse();
     let query = args.query;
-    let mut stack: Haystack = Haystack::new();
+    let mut stack: Result<Haystack, Error> = Ok(Haystack::new());
 
     if let Ok(cwd) = current_dir() {
         stack = HaystackBuilder::new(cwd).build();
     };
 
     let mut worker = Worker::new();
+    let mut files = 0;
 
-    let files = stack.paths.len();
-    worker = worker.fill_stack(stack);
-    worker.run(query);
+    if let Ok(stack) = stack {
+        files = stack.paths.len();
+        worker = worker.fill_stack(stack);
+        worker.run(query);
+    }
 
     let elapsed = start_at.elapsed();
     println!("Found {} files in {}ms", files, elapsed.as_millis());

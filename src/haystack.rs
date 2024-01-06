@@ -1,32 +1,51 @@
-use ignore::{Walk, WalkBuilder};
-use std::{collections::HashSet, path::PathBuf};
+use anyhow::Result;
+use ignore::{WalkBuilder, WalkParallel, WalkState};
+use rayon::prelude::*;
+use std::{
+    collections::HashSet,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+};
 
 pub struct HaystackBuilder {
-    walker: Walk,
+    walker: WalkParallel,
 }
 
 impl HaystackBuilder {
     pub fn new(path: PathBuf) -> Self {
-        let walker = WalkBuilder::new(path).build();
+        let walker = WalkBuilder::new(path)
+            .standard_filters(true)
+            .build_parallel();
 
         Self { walker }
     }
 
-    pub fn build(self) -> Haystack {
-        let mut vec = Vec::new();
+    pub fn build(self) -> Result<Haystack> {
+        let vec = Arc::new(Mutex::new(Vec::new()));
 
-        self.walker.for_each(|result| {
-            if let Ok(entry) = result {
-                if let Some(path) = entry.path().to_str() {
-                    vec.push(path.to_string());
+        self.walker.run(|| {
+            let vec_copy = Arc::clone(&vec);
+            Box::new(move |result| -> WalkState {
+                if let Ok(path) = result {
+                    match path.path().to_str() {
+                        Some(string) => {
+                            vec_copy.lock().unwrap().push(string.to_string());
+                            WalkState::Continue
+                        }
+                        None => WalkState::Skip,
+                    };
+                    WalkState::Continue
+                } else {
+                    WalkState::Skip
                 }
-            }
+            })
         });
 
-        let stack: HashSet<String> = vec.into_iter().collect();
+        vec.lock().unwrap().par_sort();
+        let stack: HashSet<String> = vec.lock().unwrap().iter().cloned().collect();
         let haystack = Haystack::new();
 
-        haystack.pusher(stack)
+        Ok(haystack.pusher(stack))
     }
 }
 
@@ -51,15 +70,5 @@ impl Haystack {
 impl Default for Haystack {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl<'a> IntoIterator for &'a Haystack {
-    type Item = String;
-    type IntoIter = std::collections::hash_set::IntoIter<String>;
-
-    fn into_iter(self) -> std::collections::hash_set::IntoIter<String> {
-        let paths = self.paths.clone();
-        paths.into_iter()
     }
 }

@@ -1,5 +1,7 @@
+use std::sync::{Arc, Mutex};
+
 use colored::Colorize;
-use std::thread;
+use rayon::prelude::*;
 
 use crate::common::matcher;
 use crate::haystack::Haystack;
@@ -22,29 +24,19 @@ impl Worker {
     }
 
     pub fn run(self, query: String) {
-        let handles: Vec<_> = self
-            .stack
-            .into_iter()
-            .map(|item| {
-                let query_clone = query.clone();
-                thread::spawn(move || {
-                    let mut once = 0;
-                    matcher(item.to_string(), &query_clone)
-                        .iter()
-                        .for_each(|line| {
-                            if once < 1 {
-                                println!("{}", item.as_str().purple());
-                            }
-                            println!("{}", line);
+        self.stack.paths.par_iter().for_each(|item| {
+            let query_clone = query.clone();
+            let once = Arc::new(Mutex::new(0));
+            matcher(item.to_string(), &query_clone)
+                .par_iter()
+                .for_each(|line| {
+                    if *once.lock().unwrap() < 1 {
+                        println!("{}", item.as_str().purple());
+                    }
+                    println!("{}", line);
 
-                            once += 1;
-                        })
+                    *once.lock().unwrap() += 1;
                 })
-            })
-            .collect();
-
-        handles
-            .into_iter()
-            .for_each(|handle| handle.join().unwrap())
+        });
     }
 }
