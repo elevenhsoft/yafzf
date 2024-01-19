@@ -1,23 +1,37 @@
-use std::{fs::File, io::Read};
+use std::{
+    fs::{metadata, File},
+    io::Read,
+    os::unix::fs::MetadataExt,
+};
 
 use colored::Colorize;
 use encoding_rs::{Encoding, UTF_8};
 use regex::Regex;
 
 fn can_read(path: String) -> (bool, String) {
-    if let Ok(mut file) = File::open(path) {
-        let mut buffer = Vec::new();
+    let mut result: (bool, String) = (false, String::new());
+    let max_size = 1024 * 1024;
+    let metadata = metadata(&path);
 
-        match file.read_to_end(&mut buffer) {
-            Ok(_) => match try_decode(&buffer, UTF_8) {
-                Some(decoded_text) => (true, decoded_text.to_owned()),
-                None => (false, String::new()),
-            },
-            Err(_) => (false, String::new()),
+    if let Ok(meta) = metadata {
+        if meta.size() < max_size {
+            if let Ok(mut file) = File::open(path) {
+                let mut buffer = Vec::new();
+
+                match file.read_to_end(&mut buffer) {
+                    Ok(_) => match try_decode(&buffer, UTF_8) {
+                        Some(decoded_text) => result = (true, decoded_text.to_owned()),
+                        None => result = (false, String::new()),
+                    },
+                    Err(_) => result = (false, String::new()),
+                }
+            } else {
+                result = (false, String::new())
+            }
         }
-    } else {
-        (false, String::new())
-    }
+    };
+
+    result
 }
 
 fn try_decode(buffer: &[u8], encoding: &'static Encoding) -> Option<String> {
